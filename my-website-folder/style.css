@@ -1,0 +1,178 @@
+/* Reset and base styles (unchanged) */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background: #f5f7fa;
+  color: #333;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.container {
+  text-align: center;
+  padding: 2rem;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  max-width: 400px;
+  width: 100%;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+h1 {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.tagline {
+  font-size: 1.1rem;
+  color: #666;
+  margin-bottom: 1.5rem;
+}
+
+.links a {
+  display: inline-block;
+  margin: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  text-decoration: none;
+  color: white;
+  background-color: #0077cc;
+  border-radius: 8px;
+  transition: background-color 0.3s ease;
+}
+
+.links a:hover {
+  background-color: #005fa3;
+}
+
+/* 🌙 Dark Mode Styles */
+body.dark {
+  background: #121212;
+  color: #f0f0f0;
+}
+
+body.dark .container {
+  background: #1e1e1e;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+}
+
+body.dark .tagline {
+  color: #ccc;
+}
+
+body.dark .links a {
+  background-color: #333;
+  color: #fff;
+}
+
+body.dark .links a:hover {
+  background-color: #555;
+}
+
+/* 🌗 Toggle Button */
+.toggle-button {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.toggle-button:hover {
+  transform: scale(1.2);
+}
+
+@keyframes colorCycle {
+  0%   { color: #e91e63; }
+  25%  { color: #3f51b5; }
+  50%  { color: #4caf50; }
+  75%  { color: #ff9800; }
+  100% { color: #e91e63; }
+}
+
+@keyframes spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animated-title {
+  animation:
+    colorCycle 4s infinite ease-in-out,
+    spin 20s linear infinite;
+  display: inline-block; /* needed for rotation */
+}
+
+
+@keyframes orbit {
+  0%   { transform: rotate(0deg) translateX(100px) rotate(0deg); }
+  100% { transform: rotate(360deg) translateX(100px) rotate(-360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.2); }
+}
+
+@keyframes colorCycle {
+  0%   { color: #e91e63; }
+  25%  { color: #3f51b5; }
+  50%  { color: #4caf50; }
+  75%  { color: #ff9800; }
+  100% { color: #e91e63; }
+}
+
+
+
+.animated-title {
+  font-size: 2rem;
+  animation:
+    pulse 2s ease-in-out infinite,
+    colorCycle 4s ease-in-out infinite;
+  display: inline-block;
+   font-size: 2rem;
+  animation: 
+    pulse 2s ease-in-out infinite,
+    colorCycle 4s ease-in-out infinite;
+  position: absolute;
+  left: 100px;
+  top: 100px;
+  pointer-events: none; /* prevents it from blocking clicks */
+}
+
+.trail {
+  animation: none !important; /* disable pulse/color cycle for trail copies */
+  color: inherit;
+  z-index: -1; /* keep trails behind main title */
+}
+
+#startButton {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 1rem 2rem;
+  font-size: 1.2rem;
+  z-index: 9999;
+  cursor: pointer;
+}
+
+#audioCanvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -10; /* behind everything */
+  background: black; /* or transparent if you prefer */
+}
