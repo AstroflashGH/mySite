@@ -7,12 +7,23 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <nav class="navbar">
+ <div class="nav-left">
+  <h1 class="animated-title">Astroflash</h1>
+</div>
+  <div class="nav-right">
+    <a href="#">Home</a>
+    <a href="#">Projects</a>
+    <a href="#">About</a>
+    <a href="#">Contact</a>
+  </div>
+</nav>
     <canvas id="audioCanvas"></canvas>
     <button id="startButton">Enter Astroflash</button>
 <audio id="bgAudio" src="\song.mp3" preload="auto"></audio>
   <button id="darkModeToggle" class="toggle-button">🌙</button>
 
-  <div class="container">
+  <!-- <div class="container">
     <h1 class="animated-title">Astroflash</h1>
     <p class="tagline">Genius | Designer | Inspiration </p>
 
@@ -21,7 +32,7 @@
       <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank">PornHub</a>
       <a href="https://www.youtube.com/watch?v=Alu8o0OyhTM">Email Me</a>
     </div>
-  </div>
+  </div> -->
 
   <script>
     const toggle = document.getElementById("darkModeToggle");
@@ -108,6 +119,70 @@ function drawVisualizer() {
   ctx2d.fill();
 
   requestAnimationFrame(drawVisualizer);
+
+  let angle = 0;
+
+function drawVisualizer() {
+  analyser.getByteFrequencyData(dataArray);
+  const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+
+  // Fade background
+  ctx2d.fillStyle = "rgba(0, 0, 0, 0.2)";
+  ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Pulse circle (optional, from before)
+  const radius = avg * 2;
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+
+  ctx2d.beginPath();
+  ctx2d.arc(centerX, centerY, radius, 0, Math.PI * 2);
+  ctx2d.fillStyle = `hsl(${avg * 4}, 100%, 50%)`;
+  ctx2d.fill();
+
+  // 🔺 Spinning Triangles
+  angle += 0.01 + avg / 3000; // spin speed based on audio
+
+ const numTriangles = 6;
+const orbitRadius = 200;
+const pulse = 2+ Math.sin(Date.now() * 0.004) * 0.2; // rhythmic pulse
+
+for (let i = 0; i < numTriangles; i++) {
+  const angleOffset = (i / numTriangles) * Math.PI * 2;
+  const spinAngle = angle + angleOffset;
+
+  // 🎯 Triangle Position on Orbit
+  const x = centerX + Math.cos(spinAngle) * orbitRadius;
+  const y = centerY + Math.sin(spinAngle) * orbitRadius;
+
+  // 📐 Pulsating size + optional audio factor
+  const baseSize = 30 + avg / 6;
+  const size = baseSize * pulse;
+
+  // 🔄 Spin each triangle independently
+  const selfSpin = Date.now() * 0.002 + i;
+
+  drawTriangle(x, y, size, selfSpin, `hsl(${avg * 5 + i * 40}, 80%, 60%)`);
+}
+
+  requestAnimationFrame(drawVisualizer);
+}
+
+function drawTriangle(x, y, size, rotation, color) {
+  ctx2d.save();
+  ctx2d.translate(x, y);
+  ctx2d.rotate(rotation);
+
+  ctx2d.beginPath();
+  ctx2d.moveTo(0, -size / 2);
+  ctx2d.lineTo(-size / 2, size / 2);
+  ctx2d.lineTo(size / 2, size / 2);
+  ctx2d.closePath();
+
+  ctx2d.fillStyle = color;
+  ctx2d.fill();
+  ctx2d.restore();
+}
 }
 
 drawVisualizer();
