@@ -8,33 +8,23 @@
 </head>
 <body>
   <nav class="navbar">
- <div class="nav-left">
-  <h1 class="animated-title">Astroflash</h1>
-</div>
-  <div class="nav-right">
-    <a href="#">Home</a>
-    <a href="#">Projects</a>
-    <a href="#">About</a>
-    <a href="#">Contact</a>
-  </div>
-</nav>
-    <canvas id="audioCanvas"></canvas>
-    <button id="startButton">Enter Astroflash</button>
-<audio id="bgAudio" src="song.mp3" preload="auto"></audio>
+    <div class="nav-left">
+      <h1 class="animated-title">Astroflash</h1>
+    </div>
+    <div class="nav-right">
+      <a href="#">Home</a>
+      <a href="#">Projects</a>
+      <a href="#">About</a>
+      <a href="#">Contact</a>
+    </div>
+  </nav>
+  <canvas id="audioCanvas"></canvas>
+  <button id="startButton">Enter Astroflash</button>
+  <audio id="bgAudio" src="song.mp3" preload="auto"></audio>
   <button id="darkModeToggle" class="toggle-button">🌙</button>
 
-  <!-- <div class="container">
-    <h1 class="animated-title">Astroflash</h1>
-    <p class="tagline">Genius | Designer | Inspiration </p>
-
-    <div class="links">
-      <a href="https://www.youtube.com/@AstroflashYT" target="_blank">Youtube</a>
-      <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank">PornHub</a>
-      <a href="https://www.youtube.com/watch?v=Alu8o0OyhTM">Email Me</a>
-    </div>
-  </div> -->
-
   <script>
+    // Dark mode toggle with fallback (no localStorage)
     const toggle = document.getElementById("darkModeToggle");
     const body = document.body;
 
@@ -42,209 +32,175 @@
       if (isDark) {
         body.classList.add("dark");
         toggle.textContent = "☀️";
-        localStorage.setItem("theme", "dark");
       } else {
         body.classList.remove("dark");
         toggle.textContent = "🌙";
-        localStorage.setItem("theme", "light");
       }
-    }
-
-    // Load stored preference
-    const savedTheme = localStorage.getItem("theme");
-    if (savedTheme === "dark") {
-      setTheme(true);
     }
 
     toggle.addEventListener("click", () => {
       setTheme(!body.classList.contains("dark"));
     });
-  </script>
-<script>
-  const startButton = document.getElementById("startButton");
-  const audio = document.getElementById("bgAudio");
 
-  startButton.addEventListener("click", async () => {
-    startButton.remove(); // Hide button
+    // Audio visualization with error handling
+    const startButton = document.getElementById("startButton");
+    const audio = document.getElementById("bgAudio");
 
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const source = ctx.createMediaElementSource(audio);
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 64;
+    startButton.addEventListener("click", async () => {
+      try {
+        startButton.remove();
 
-    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const source = ctx.createMediaElementSource(audio);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 64;
 
-    source.connect(analyser);
-    analyser.connect(ctx.destination);
-    audio.play();
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-    function reactToAudio() {
-      analyser.getByteFrequencyData(dataArray);
-      const avg = dataArray.reduce((a, b) => a + b) / dataArray.length;
+        source.connect(analyser);
+        analyser.connect(ctx.destination);
+        
+        // Error handling for audio playback
+        audio.addEventListener('error', (e) => {
+          console.warn('Audio failed to load, continuing with silent visualization');
+        });
 
-      // Background flashes with volume
-      document.body.style.backgroundColor = `hsl(${avg * 3}, 80%, 20%)`;
+        await audio.play().catch(e => {
+          console.warn('Audio playback failed, continuing with silent mode');
+        });
 
-      requestAnimationFrame(reactToAudio);
+        // Canvas setup
+        const canvas = document.getElementById("audioCanvas");
+        const ctx2d = canvas.getContext("2d");
+
+        function resizeCanvas() {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener("resize", resizeCanvas);
+
+        let angle = 0;
+
+        function drawVisualizer() {
+          analyser.getByteFrequencyData(dataArray);
+          const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+
+          // Background flashes with volume
+          document.body.style.backgroundColor = `hsl(${avg * 3}, 80%, 20%)`;
+
+          // Fade background
+          ctx2d.fillStyle = "rgba(0, 0, 0, 0.2)";
+          ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+
+          // Center pulse circle
+          const radius = avg * 2;
+          const centerX = canvas.width / 2;
+          const centerY = canvas.height / 2;
+
+          ctx2d.beginPath();
+          ctx2d.arc(centerX, centerY, radius, 0, Math.PI * 2);
+          ctx2d.fillStyle = `hsl(${avg * 4}, 100%, 50%)`;
+          ctx2d.fill();
+
+          // Spinning Triangles
+          angle += 0.01 + avg / 3000;
+
+          const numTriangles = 6;
+          const orbitRadius = 200;
+          const pulse = 2 + Math.sin(Date.now() * 0.004) * 0.2;
+
+          for (let i = 0; i < numTriangles; i++) {
+            const angleOffset = (i / numTriangles) * Math.PI * 2;
+            const spinAngle = angle + angleOffset;
+
+            const x = centerX + Math.cos(spinAngle) * orbitRadius;
+            const y = centerY + Math.sin(spinAngle) * orbitRadius;
+
+            const baseSize = 30 + avg / 6;
+            const size = baseSize * pulse;
+
+            const selfSpin = Date.now() * 0.002 + i;
+
+            drawTriangle(x, y, size, selfSpin, `hsl(${avg * 5 + i * 40}, 80%, 60%)`);
+          }
+
+          requestAnimationFrame(drawVisualizer);
+        }
+
+        function drawTriangle(x, y, size, rotation, color) {
+          ctx2d.save();
+          ctx2d.translate(x, y);
+          ctx2d.rotate(rotation);
+
+          ctx2d.beginPath();
+          ctx2d.moveTo(0, -size / 2);
+          ctx2d.lineTo(-size / 2, size / 2);
+          ctx2d.lineTo(size / 2, size / 2);
+          ctx2d.closePath();
+
+          ctx2d.fillStyle = color;
+          ctx2d.fill();
+          ctx2d.restore();
+        }
+
+        drawVisualizer();
+
+      } catch (error) {
+        console.error('Audio context initialization failed:', error);
+        // Fallback: show a message or continue without audio
+        alert('Audio features unavailable. The site will continue without sound.');
+      }
+    });
+
+    // Bouncing title animation
+    const title = document.querySelector(".animated-title");
+    let x = 100, y = 100;
+    let dx = 2, dy = 2;
+
+    function bounce() {
+      const rect = title.getBoundingClientRect();
+      const screenW = window.innerWidth;
+      const screenH = window.innerHeight;
+
+      if (x + rect.width >= screenW || x <= 0) dx *= -1;
+      if (y + rect.height >= screenH || y <= 0) dy *= -1;
+
+      x += dx;
+      y += dy;
+
+      title.style.left = x + "px";
+      title.style.top = y + "px";
+
+      createTrail(x, y);
+
+      requestAnimationFrame(bounce);
     }
 
-    reactToAudio();
-    const canvas = document.getElementById("audioCanvas");
-const ctx2d = canvas.getContext("2d");
+    function createTrail(x, y) {
+      const trail = title.cloneNode(true);
+      trail.style.left = x + "px";
+      trail.style.top = y + "px";
+      trail.style.opacity = "0.1";
+      trail.style.pointerEvents = "none";
+      trail.style.position = "absolute";
+      trail.classList.add("trail");
 
-function resizeCanvas() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-resizeCanvas();
-window.addEventListener("resize", resizeCanvas);
+      document.body.appendChild(trail);
 
-function drawVisualizer() {
-  analyser.getByteFrequencyData(dataArray);
+      setTimeout(() => {
+        trail.style.transition = "opacity 0.5s ease-out";
+        trail.style.opacity = "0";
+      }, 10);
 
-  const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+      setTimeout(() => {
+        if (trail.parentNode) {
+          trail.remove();
+        }
+      }, 600);
+    }
 
-  // Background fade
-  ctx2d.fillStyle = "rgba(0, 0, 0, 0.2)";
-  ctx2d.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Draw pulsing circle in center
-  const radius = avg * 4;
-  const centerX = canvas.width / 2;
-  const centerY = canvas.height / 2;
-
-  ctx2d.beginPath();
-  ctx2d.arc(centerX, centerY, radius, 0, Math.PI * 2);
-  ctx2d.fillStyle = `hsl(${avg * 4}, 100%, 50%)`;
-  ctx2d.fill();
-
-  requestAnimationFrame(drawVisualizer);
-
-  let angle = 0;
-
-function drawVisualizer() {
-  analyser.getByteFrequencyData(dataArray);
-  const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-
-  // Fade background
-  ctx2d.fillStyle = "rgba(0, 0, 0, 0.2)";
-  ctx2d.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Pulse circle (optional, from before)
-  const radius = avg * 2;
-  const centerX = canvas.width / 2;
-  const centerY = canvas.height / 2;
-
-  ctx2d.beginPath();
-  ctx2d.arc(centerX, centerY, radius, 0, Math.PI * 2);
-  ctx2d.fillStyle = `hsl(${avg * 4}, 100%, 50%)`;
-  ctx2d.fill();
-
-  // 🔺 Spinning Triangles
-  angle += 0.01 + avg / 3000; // spin speed based on audio
-
- const numTriangles = 6;
-const orbitRadius = 200;
-const pulse = 2+ Math.sin(Date.now() * 0.004) * 0.2; // rhythmic pulse
-
-for (let i = 0; i < numTriangles; i++) {
-  const angleOffset = (i / numTriangles) * Math.PI * 2;
-  const spinAngle = angle + angleOffset;
-
-  // 🎯 Triangle Position on Orbit
-  const x = centerX + Math.cos(spinAngle) * orbitRadius;
-  const y = centerY + Math.sin(spinAngle) * orbitRadius;
-
-  // 📐 Pulsating size + optional audio factor
-  const baseSize = 30 + avg / 6;
-  const size = baseSize * pulse;
-
-  // 🔄 Spin each triangle independently
-  const selfSpin = Date.now() * 0.002 + i;
-
-  drawTriangle(x, y, size, selfSpin, `hsl(${avg * 5 + i * 40}, 80%, 60%)`);
-}
-
-  requestAnimationFrame(drawVisualizer);
-}
-
-function drawTriangle(x, y, size, rotation, color) {
-  ctx2d.save();
-  ctx2d.translate(x, y);
-  ctx2d.rotate(rotation);
-
-  ctx2d.beginPath();
-  ctx2d.moveTo(0, -size / 2);
-  ctx2d.lineTo(-size / 2, size / 2);
-  ctx2d.lineTo(size / 2, size / 2);
-  ctx2d.closePath();
-
-  ctx2d.fillStyle = color;
-  ctx2d.fill();
-  ctx2d.restore();
-}
-}
-
-drawVisualizer();
-
-  });
-</script>
-
-
-
-
- <script>
-  const title = document.querySelector(".animated-title");
-
-  let x = 100, y = 100;
-  let dx = 2, dy = 2;
-
-  function bounce() {
-    const rect = title.getBoundingClientRect();
-    const screenW = window.innerWidth;
-    const screenH = window.innerHeight;
-
-    if (x + rect.width >= screenW || x <= 0) dx *= -1;
-    if (y + rect.height >= screenH || y <= 0) dy *= -1;
-
-    x += dx;
-    y += dy;
-
-    title.style.left = x + "px";
-    title.style.top = y + "px";
-
-    createTrail(x, y);
-
-    requestAnimationFrame(bounce);
-  }
-
-  function createTrail(x, y) {
-    const trail = title.cloneNode(true);
-    trail.style.left = x + "px";
-    trail.style.top = y + "px";
-    trail.style.opacity = "0.1";
-    trail.style.pointerEvents = "none";
-    trail.style.position = "absolute";
-    trail.classList.add("trail");
-
-    document.body.appendChild(trail);
-
-    // Fade out and remove after 0.5s
-    setTimeout(() => {
-      trail.style.transition = "opacity 0.5s ease-out";
-      trail.style.opacity = "0";
-    }, 10);
-
-    setTimeout(() => {
-      trail.remove();
-    }, 600);
-  }
-
-  bounce();
-</script>
-
-
-  
+    bounce();
+  </script>
 </body>
 </html>
-
