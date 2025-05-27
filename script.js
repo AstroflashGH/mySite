@@ -45,7 +45,7 @@ const vertexShader = `
     vNormal = normal;
     
     vec3 pos = position;
-    float wave = sin(pos.x * 10.0 + time * 2.0) * cos(pos.y * 8.0 + time * 1.5) * audioData * 0.3;
+    float wave = sin(pos.x * 10.0 + time * 2.0) * cos(pos.y * 8.0 + time * 1.5) * audioData * 0.7;
     pos += normal * wave;
     
     gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
@@ -106,7 +106,7 @@ startButton.addEventListener("click", async () => {
     analyser.connect(audioContext.destination);
   } catch (err) {
     console.warn("Web Audio API setup failed:", err);
-    dataArray = new Uint8Array(128).fill(50);
+    dataArray = new Uint8Array(128).fill(50); // Fallback for no audio data
   }
 
   // Three.js Setup with enhanced settings
@@ -128,7 +128,8 @@ startButton.addEventListener("click", async () => {
   // Create multiple complex geometries
   const objects = [];
   const materials = [];
-  
+  const cubeMaterials = []; // New array to hold cube materials
+
   // Main torus knot with custom shader
   const mainGeometry = new THREE.TorusKnotGeometry(2, 0.6, 200, 32);
   const shaderMaterial = new THREE.ShaderMaterial({
@@ -148,7 +149,7 @@ startButton.addEventListener("click", async () => {
   materials.push(shaderMaterial);
 
   // Create particle system
-  const particleCount = 5000;
+  const particleCount = 500;
   const particleGeometry = new THREE.BufferGeometry();
   const positions = new Float32Array(particleCount * 3);
   const colors = new Float32Array(particleCount * 3);
@@ -198,7 +199,7 @@ startButton.addEventListener("click", async () => {
   for (let i = 0; i < 12; i++) {
     const cubeGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
     const cubeMat = new THREE.MeshStandardMaterial({
-      color: 0xff00ff,
+      color: 0xff00ff, // Initial color
       metalness: 0.8,
       roughness: 0.2,
       emissive: 0x440044
@@ -210,6 +211,7 @@ startButton.addEventListener("click", async () => {
     scene.add(cube);
     objects.push(cube);
     materials.push(cubeMat);
+    cubeMaterials.push(cubeMat); // Store cube material for individual color control
   }
 
   // Complex lighting setup
@@ -261,17 +263,17 @@ startButton.addEventListener("click", async () => {
     let avgFrequency = 50;
     let frequencyArray = new Array(8).fill(50);
     
-    if (analyser && dataArray) {
+    if (analyser && dataArray) { // Check if analyser and dataArray exist
       try {
-        analyser.getByteFrequencyData(dataArray);
-        avgFrequency = dataArray.reduce((a, b) => a + b) / dataArray.length;
+        analyser.getByteFrequencyData(dataArray); // Get frequency data from analyser
+        avgFrequency = dataArray.reduce((a, b) => a + b) / dataArray.length; // Calculate average frequency
         
         // Get frequency bands for different effects
-        const bandSize = Math.floor(dataArray.length / 8);
+        const bandSize = Math.floor(dataArray.length / 8); // Determine the size of each frequency band
         for (let i = 0; i < 8; i++) {
-          const start = i * bandSize;
-          const end = start + bandSize;
-          frequencyArray[i] = dataArray.slice(start, end).reduce((a, b) => a + b) / bandSize;
+          const start = i * bandSize; // Calculate the start index for the current band
+          const end = start + bandSize; // Calculate the end index for the current band
+          frequencyArray[i] = dataArray.slice(start, end).reduce((a, b) => a + b) / bandSize; // Calculate average frequency for the band
         }
       } catch (err) {
         // Use default values
@@ -305,19 +307,29 @@ startButton.addEventListener("click", async () => {
       }
     });
 
-    // Animate cubes
-    objects.slice(9).forEach((cube, i) => {
-      if (cube.geometry.type === 'BoxGeometry') {
-        const freq = frequencyArray[i % 8] / 255;
-        cube.rotation.x += 0.03 + freq * 0.06;
-        cube.rotation.y += 0.02 + freq * 0.04;
-        cube.rotation.z += 0.04 + freq * 0.05;
-        
-        const angle = (i / 12) * Math.PI * 2 - time * 0.3;
-        cube.position.x = Math.cos(angle) * 6;
-        cube.position.z = Math.sin(angle) * 6;
-        cube.position.y = Math.sin(time * 2 + i) * 2 + freq * 4;
-      }
+    // Animate cubes and change their color with music
+    cubeMaterials.forEach((material, i) => { // Iterate through the stored cube materials
+      const freq = frequencyArray[i % frequencyArray.length] / 255; // Use modulo to cycle through frequency bands
+      
+      // Interpolate color based on frequency
+      // You can experiment with different color ranges here
+      const hue = (time * 0.05 + freq * 0.5 + i * 0.1) % 1; // Vary hue based on time, frequency, and cube index
+      const saturation = 0.8 + freq * 0.2; // Increase saturation with higher frequency
+      const lightness = 0.5 + freq * 0.3; // Increase lightness with higher frequency
+      
+      material.color.setHSL(hue, saturation, lightness); // Set the material's color using HSL values
+      material.emissive.setHSL(hue, saturation * 0.5, lightness * 0.5); // Also adjust emissive color
+
+      // Apply other cube animations (position, rotation)
+      const cube = objects[9 + i]; // Get the corresponding cube from the main objects array
+      cube.rotation.x += 0.03 + freq * 0.06; // Rotate x based on frequency
+      cube.rotation.y += 0.02 + freq * 0.04; // Rotate y based on frequency
+      cube.rotation.z += 0.04 + freq * 0.05; // Rotate z based on frequency
+      
+      const angle = (i / 12) * Math.PI * 2 - time * 0.3; // Calculate angle for positioning
+      cube.position.x = Math.cos(angle) * 6; // Set x position
+      cube.position.z = Math.sin(angle) * 6; // Set z position
+      cube.position.y = Math.sin(time * 2 + i) * 2 + freq * 4; // Set y position, influenced by frequency
     });
 
     // Animate particles
