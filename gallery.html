@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astroflash - Gallery</title>
+    <link rel="stylesheet" href="style.css"> <style>
+        /* Specific styles for the gallery page */
+        body {
+            background: linear-gradient(to bottom, #0a0a20, #000000); /* Dark space background */
+            color: #ffffff;
+            font-family: 'Inter', sans-serif; /* Use your main font */
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-bottom: 50px; /* Space at the bottom */
+        }
+
+        .gallery-container {
+            width: 90%;
+            max-width: 900px; /* Max width for readability */
+            margin-top: 80px; /* Space from top */
+            display: flex;
+            flex-direction: column; /* Images stacked vertically */
+            gap: 40px; /* Space between images */
+            align-items: center; /* Center images horizontally */
+        }
+
+        .gallery-item {
+            width: 100%; /* Take full width of container */
+            background-color: rgba(255, 255, 255, 0.05); /* Slightly transparent background */
+            border-radius: 10px;
+            overflow: hidden; /* Ensure image corners are rounded */
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); /* Deep shadow for floating effect */
+            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+            border: 1px solid rgba(255, 255, 255, 0.1); /* Subtle border */
+        }
+
+        .gallery-item:hover {
+            transform: translateY(-5px) scale(1.01);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.7);
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: auto; /* Maintain aspect ratio */
+            display: block;
+            object-fit: contain; /* Scales down image to fit, maintains aspect ratio */
+            max-height: 500px; /* Limit height of very tall images if needed */
+        }
+
+        .gallery-item-caption {
+            padding: 15px 20px;
+            font-size: 1.1em;
+            text-align: center;
+            background-color: rgba(0, 0, 0, 0.3); /* Darker caption background */
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Navigation for gallery page */
+        .gallery-nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.7); /* Semi-transparent black background */
+            z-index: 1000;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .gallery-nav a {
+            color: #ffffff; /* Your vibrant accent color */
+            text-decoration: none;
+            font-size: 1.3em;
+            font-weight: bold;
+            transition: color 0.3s ease;
+        }
+
+        .gallery-nav a:hover {
+            color: #8000ff; /* Another accent color on hover */
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .gallery-container {
+                width: 95%;
+                margin-top: 60px;
+                gap: 30px;
+            }
+            .gallery-item img {
+                max-height: 400px;
+            }
+            .gallery-item-caption {
+                font-size: 1em;
+            }
+            .gallery-nav a {
+                font-size: 1.1em;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .gallery-item img {
+                max-height: 300px;
+            }
+            .gallery-item-caption {
+                font-size: 0.9em;
+                padding: 10px 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="gallery-nav">
+        <a href="index.html">← Back to Astroflash Home</a>
+    </header>
+
+    <div class="gallery-container">
+        <div class="gallery-item">
+            <img src="images/image1.png" alt="Beautiful Spiral Galaxy">
+            <div class="gallery-item-caption">A mesmerizing spiral galaxy in the cosmic void.</div>
+        </div>
+
+        <div class="gallery-item">
+            <img src="images/image2.png" alt="Vast Nebula Cloudscape">
+            <div class="gallery-item-caption">A vast, colorful nebula, where stars are born.</div>
+        </div>
+
+        <div class="gallery-item">
+            <img src="images/image3.png" alt="Alien Planet Surface">
+            <div class="gallery-item-caption">Exploring the rugged surface of an exoplanet.</div>
+        </div>
+
+        <div class="gallery-item">
+            <img src="images/image4.png" alt="Astronaut floating in space">
+            <div class="gallery-item-caption">An astronaut in the infinite expanse.</div>
+        </div>
+
+        <div class="gallery-item">
+            <img src="images/image5.png" alt="Astronaut floating in space">
+            <div class="gallery-item-caption">An astronaut in the infinite expanse.</div>
+        </div>
+
+
+
+        </div>
+</body>
+</html>

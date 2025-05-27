@@ -45,7 +45,8 @@ const vertexShader = `
     vNormal = normal;
     
     vec3 pos = position;
-    float wave = sin(pos.x * 10.0 + time * 2.0) * cos(pos.y * 8.0 + time * 1.5) * audioData * 0.7;
+    // Increased the multiplier for audioData from 0.3 to 1.5 for larger oscillation
+    float wave = sin(pos.x * 10.0 + time * 2.0) * cos(pos.y * 8.0 + time * 1.5) * audioData * 1.5;
     pos += normal * wave;
     
     gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
@@ -129,6 +130,7 @@ startButton.addEventListener("click", async () => {
   const objects = [];
   const materials = [];
   const cubeMaterials = []; // New array to hold cube materials
+  const donutMeshes = []; // New array to hold donut meshes
 
   // Main torus knot with custom shader
   const mainGeometry = new THREE.TorusKnotGeometry(2, 0.6, 200, 32);
@@ -147,6 +149,42 @@ startButton.addEventListener("click", async () => {
   scene.add(mainMesh);
   objects.push(mainMesh);
   materials.push(shaderMaterial);
+
+  // --- NEW CODE FOR DONUTS ---
+  const donutGeometry = new THREE.TorusGeometry(1.5, 0.5, 16, 100); // Smaller donut
+  
+  // Left Donut
+  const donutMaterial1 = new THREE.MeshPhongMaterial({
+    color: 0x00ff00, // Initial color
+    emissive: 0x008800,
+    shininess: 100,
+    transparent: true,
+    opacity: 0.8
+  });
+  const donutMesh1 = new THREE.Mesh(donutGeometry, donutMaterial1);
+  donutMesh1.position.set(-8, 0, 0); // Position to the left
+  donutMesh1.castShadow = true;
+  donutMesh1.receiveShadow = true;
+  scene.add(donutMesh1);
+  donutMeshes.push(donutMesh1); // Add to new array for animation
+  objects.push(donutMesh1); // Also add to general objects array if needed for other global ops
+
+  // Right Donut
+  const donutMaterial2 = new THREE.MeshPhongMaterial({
+    color: 0xffff00, // Initial color
+    emissive: 0x888800,
+    shininess: 100,
+    transparent: true,
+    opacity: 0.8
+  });
+  const donutMesh2 = new THREE.Mesh(donutGeometry, donutMaterial2);
+  donutMesh2.position.set(8, 0, 0); // Position to the right
+  donutMesh2.castShadow = true;
+  donutMesh2.receiveShadow = true;
+  scene.add(donutMesh2);
+  donutMeshes.push(donutMesh2); // Add to new array for animation
+  objects.push(donutMesh2); // Also add to general objects array if needed for other global ops
+  // --- END NEW CODE FOR DONUTS ---
 
   // Create particle system
   const particleCount = 500;
@@ -263,17 +301,17 @@ startButton.addEventListener("click", async () => {
     let avgFrequency = 50;
     let frequencyArray = new Array(8).fill(50);
     
-    if (analyser && dataArray) { // Check if analyser and dataArray exist
+    if (analyser && dataArray) {
       try {
-        analyser.getByteFrequencyData(dataArray); // Get frequency data from analyser
-        avgFrequency = dataArray.reduce((a, b) => a + b) / dataArray.length; // Calculate average frequency
+        analyser.getByteFrequencyData(dataArray);
+        avgFrequency = dataArray.reduce((a, b) => a + b) / dataArray.length;
         
         // Get frequency bands for different effects
-        const bandSize = Math.floor(dataArray.length / 8); // Determine the size of each frequency band
+        const bandSize = Math.floor(dataArray.length / 8);
         for (let i = 0; i < 8; i++) {
-          const start = i * bandSize; // Calculate the start index for the current band
-          const end = start + bandSize; // Calculate the end index for the current band
-          frequencyArray[i] = dataArray.slice(start, end).reduce((a, b) => a + b) / bandSize; // Calculate average frequency for the band
+          const start = i * bandSize;
+          const end = start + bandSize;
+          frequencyArray[i] = dataArray.slice(start, end).reduce((a, b) => a + b) / bandSize;
         }
       } catch (err) {
         // Use default values
@@ -292,8 +330,35 @@ startButton.addEventListener("click", async () => {
     mainMesh.rotation.z += 0.008;
     mainMesh.scale.setScalar(1 + normalizedAudio * 0.5);
 
+    // --- NEW CODE FOR DONUT ANIMATION ---
+    donutMeshes.forEach((donut, i) => {
+      const freq = frequencyArray[i % frequencyArray.length] / 255; // Use modulo for frequency band
+      
+      // Rotate
+      donut.rotation.x += 0.015 + freq * 0.03;
+      donut.rotation.y += 0.02 + freq * 0.04;
+
+      // Scale (pulsate with music)
+      donut.scale.setScalar(1 + freq * 0.3); // Scale up based on frequency
+
+      // Change color based on frequency and time
+      const hue = (time * 0.08 + freq * 0.3 + i * 0.5) % 1; // Different hue for each donut, reacting to time and frequency
+      const saturation = 0.7 + freq * 0.3;
+      const lightness = 0.6 + freq * 0.2;
+      donut.material.color.setHSL(hue, saturation, lightness);
+      donut.material.emissive.setHSL(hue, saturation * 0.5, lightness * 0.5);
+
+      // Simple oscillation on Y-axis
+      donut.position.y = Math.sin(time * 2 + i * Math.PI) * (1 + freq) * 0.5; // oscillate up/down
+      
+      // Small orbital movement around their original X position
+      donut.position.x = (i === 0 ? -8 : 8) + Math.cos(time * 0.5 + i * Math.PI) * freq * 2;
+      donut.position.z = Math.sin(time * 0.7 + i * Math.PI) * freq * 1.5;
+    });
+    // --- END NEW CODE FOR DONUT ANIMATION ---
+
     // Animate spheres
-    objects.slice(1, 9).forEach((sphere, i) => {
+    objects.slice(1, 9).forEach((sphere, i) => { // Adjusted slice range if donuts are added to 'objects' earlier
       if (sphere.geometry.type === 'IcosahedronGeometry') {
         const freq = frequencyArray[i] / 255;
         sphere.rotation.x += 0.02 + freq * 0.05;
@@ -308,28 +373,25 @@ startButton.addEventListener("click", async () => {
     });
 
     // Animate cubes and change their color with music
-    cubeMaterials.forEach((material, i) => { // Iterate through the stored cube materials
-      const freq = frequencyArray[i % frequencyArray.length] / 255; // Use modulo to cycle through frequency bands
+    cubeMaterials.forEach((material, i) => {
+      const freq = frequencyArray[i % frequencyArray.length] / 255;
       
-      // Interpolate color based on frequency
-      // You can experiment with different color ranges here
-      const hue = (time * 0.05 + freq * 0.5 + i * 0.1) % 1; // Vary hue based on time, frequency, and cube index
-      const saturation = 0.8 + freq * 0.2; // Increase saturation with higher frequency
-      const lightness = 0.5 + freq * 0.3; // Increase lightness with higher frequency
+      const hue = (time * 0.05 + freq * 0.5 + i * 0.1) % 1;
+      const saturation = 0.8 + freq * 0.2;
+      const lightness = 0.5 + freq * 0.3;
       
-      material.color.setHSL(hue, saturation, lightness); // Set the material's color using HSL values
-      material.emissive.setHSL(hue, saturation * 0.5, lightness * 0.5); // Also adjust emissive color
+      material.color.setHSL(hue, saturation, lightness);
+      material.emissive.setHSL(hue, saturation * 0.5, lightness * 0.5);
 
-      // Apply other cube animations (position, rotation)
-      const cube = objects[9 + i]; // Get the corresponding cube from the main objects array
-      cube.rotation.x += 0.03 + freq * 0.06; // Rotate x based on frequency
-      cube.rotation.y += 0.02 + freq * 0.04; // Rotate y based on frequency
-      cube.rotation.z += 0.04 + freq * 0.05; // Rotate z based on frequency
+      const cube = objects[9 + i]; // Ensure correct index if new objects are added before cubes
+      cube.rotation.x += 0.03 + freq * 0.06;
+      cube.rotation.y += 0.02 + freq * 0.04;
+      cube.rotation.z += 0.04 + freq * 0.05;
       
-      const angle = (i / 12) * Math.PI * 2 - time * 0.3; // Calculate angle for positioning
-      cube.position.x = Math.cos(angle) * 6; // Set x position
-      cube.position.z = Math.sin(angle) * 6; // Set z position
-      cube.position.y = Math.sin(time * 2 + i) * 2 + freq * 4; // Set y position, influenced by frequency
+      const angle = (i / 12) * Math.PI * 2 - time * 0.3;
+      cube.position.x = Math.cos(angle) * 6;
+      cube.position.z = Math.sin(angle) * 6;
+      cube.position.y = Math.sin(time * 2 + i) * 2 + freq * 4;
     });
 
     // Animate particles
