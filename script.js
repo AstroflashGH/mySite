@@ -12,26 +12,12 @@ const audio = document.getElementById("bgAudio");
 let isDarkMode = false;
 let renderer = null;
 
-// Dark mode colors
-const COLORS = {
-  light: 0x000000,
-  dark: 0x0a0a0a
-};
-
 // Dark mode toggle functionality
 function toggleDarkMode() {
   isDarkMode = !isDarkMode;
   document.body.classList.toggle('dark');
   darkToggle.textContent = isDarkMode ? "☀️" : "🌙";
-  
-  console.log('Dark mode toggled:', isDarkMode); // Debug log
-  
-  // Update renderer background if it exists
-  if (renderer) {
-    const bgColor = isDarkMode ? COLORS.dark : COLORS.light;
-    renderer.setClearColor(bgColor);
-    console.log('Renderer background updated to:', bgColor.toString(16)); // Debug log
-  }
+  console.log('Dark mode toggled:', isDarkMode);
 }
 
 darkToggle.addEventListener("click", toggleDarkMode);
@@ -45,15 +31,59 @@ volumeSlider.addEventListener("input", () => {
   }
 });
 
+// Custom shader material for procedural effects
+const vertexShader = `
+  varying vec2 vUv;
+  varying vec3 vPosition;
+  varying vec3 vNormal;
+  uniform float time;
+  uniform float audioData;
+  
+  void main() {
+    vUv = uv;
+    vPosition = position;
+    vNormal = normal;
+    
+    vec3 pos = position;
+    float wave = sin(pos.x * 10.0 + time * 2.0) * cos(pos.y * 8.0 + time * 1.5) * audioData * 0.3;
+    pos += normal * wave;
+    
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+  }
+`;
+
+const fragmentShader = `
+  varying vec2 vUv;
+  varying vec3 vPosition;
+  varying vec3 vNormal;
+  uniform float time;
+  uniform float audioData;
+  uniform vec3 color1;
+  uniform vec3 color2;
+  uniform vec3 color3;
+  
+  void main() {
+    float noise = sin(vPosition.x * 20.0 + time) * cos(vPosition.y * 15.0 + time * 0.5) * sin(vPosition.z * 25.0 + time * 2.0);
+    
+    vec3 color = mix(color1, color2, sin(time + vUv.x * 5.0) * 0.5 + 0.5);
+    color = mix(color, color3, cos(time * 1.5 + vUv.y * 3.0) * 0.5 + 0.5);
+    
+    float intensity = (audioData * 2.0 + noise * 0.5) * (1.0 + sin(time * 3.0) * 0.3);
+    color *= intensity;
+    
+    float fresnel = pow(1.0 - dot(normalize(vNormal), vec3(0.0, 0.0, 1.0)), 2.0);
+    color += fresnel * audioData * vec3(1.0, 0.3, 1.0);
+    
+    gl_FragColor = vec4(color, 1.0);
+  }
+`;
+
 // Main application start
 startButton.addEventListener("click", async () => {
-  console.log('Starting 3D scene...'); // Debug log
+  console.log('Starting GPU-intensive 3D scene...');
   
-  // Fade out start button
   startButton.classList.add("fade-out");
   setTimeout(() => startButton.remove(), 500);
-  
-  // Show volume control
   volumeControl.style.display = "flex";
 
   // Setup audio
@@ -62,114 +92,273 @@ startButton.addEventListener("click", async () => {
     await audio.play();
   } catch (err) {
     console.warn("Audio playback blocked:", err);
-    alert("Audio playback was blocked. Please enable audio for the full experience.");
   }
 
-  // Setup Web Audio API for visualization
+  // Setup Web Audio API
   let audioContext, audioSource, analyser, dataArray;
-  
   try {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     audioSource = audioContext.createMediaElementSource(audio);
     analyser = audioContext.createAnalyser();
-    analyser.fftSize = 64;
+    analyser.fftSize = 256;
     dataArray = new Uint8Array(analyser.frequencyBinCount);
-    
     audioSource.connect(analyser);
     analyser.connect(audioContext.destination);
   } catch (err) {
     console.warn("Web Audio API setup failed:", err);
-    // Create dummy data for visualization
-    dataArray = new Uint8Array(32).fill(50);
+    dataArray = new Uint8Array(128).fill(50);
   }
 
-  // Three.js Setup
+  // Three.js Setup with enhanced settings
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(
-    75, 
-    window.innerWidth / window.innerHeight, 
-    0.1, 
-    1000
-  );
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
   
-  // Create renderer with initial background color
-  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer = new THREE.WebGLRenderer({ 
+    antialias: true, 
+    alpha: true,
+    powerPreference: "high-performance"
+  });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  
-  // Set initial background color based on current mode
-  const initialBgColor = isDarkMode ? COLORS.dark : COLORS.light;
-  renderer.setClearColor(initialBgColor);
-  console.log('Initial renderer background:', initialBgColor.toString(16)); // Debug log
-  
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x000000, 0);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   document.body.appendChild(renderer.domElement);
 
-  // Create 3D objects
-  const geometry = new THREE.TorusKnotGeometry(1, 0.3, 128, 16);
-  const material = new THREE.MeshStandardMaterial({
-    color: 0xff00ff,
-    emissive: 0xff00ff,
-    emissiveIntensity: 0.2,
-    roughness: 0.3,
-    metalness: 0.2
+  // Create multiple complex geometries
+  const objects = [];
+  const materials = [];
+  
+  // Main torus knot with custom shader
+  const mainGeometry = new THREE.TorusKnotGeometry(2, 0.6, 200, 32);
+  const shaderMaterial = new THREE.ShaderMaterial({
+    vertexShader,
+    fragmentShader,
+    uniforms: {
+      time: { value: 0 },
+      audioData: { value: 0 },
+      color1: { value: new THREE.Color(0xff0080) },
+      color2: { value: new THREE.Color(0x8000ff) },
+      color3: { value: new THREE.Color(0x00ffff) }
+    }
   });
+  const mainMesh = new THREE.Mesh(mainGeometry, shaderMaterial);
+  scene.add(mainMesh);
+  objects.push(mainMesh);
+  materials.push(shaderMaterial);
 
-  const mesh = new THREE.Mesh(geometry, material);
-  scene.add(mesh);
+  // Create particle system
+  const particleCount = 5000;
+  const particleGeometry = new THREE.BufferGeometry();
+  const positions = new Float32Array(particleCount * 3);
+  const colors = new Float32Array(particleCount * 3);
+  
+  for (let i = 0; i < particleCount * 3; i += 3) {
+    positions[i] = (Math.random() - 0.5) * 50;
+    positions[i + 1] = (Math.random() - 0.5) * 50;
+    positions[i + 2] = (Math.random() - 0.5) * 50;
+    
+    colors[i] = Math.random();
+    colors[i + 1] = Math.random();
+    colors[i + 2] = Math.random();
+  }
+  
+  particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  
+  const particleMaterial = new THREE.PointsMaterial({
+    size: 2,
+    vertexColors: true,
+    blending: THREE.AdditiveBlending,
+    transparent: true
+  });
+  
+  const particles = new THREE.Points(particleGeometry, particleMaterial);
+  scene.add(particles);
 
-  // Lighting
-  const pointLight = new THREE.PointLight(0xff00ff, 1.5, 100);
-  pointLight.position.set(2, 2, 2);
-  scene.add(pointLight);
+  // Create multiple rotating spheres
+  for (let i = 0; i < 8; i++) {
+    const sphereGeo = new THREE.IcosahedronGeometry(0.5, 4);
+    const sphereMat = new THREE.MeshPhongMaterial({
+      color: new THREE.Color().setHSL(i / 8, 1, 0.5),
+      transparent: true,
+      opacity: 0.7,
+      shininess: 100
+    });
+    
+    const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+    const angle = (i / 8) * Math.PI * 2;
+    sphere.position.set(Math.cos(angle) * 8, Math.sin(angle) * 8, 0);
+    scene.add(sphere);
+    objects.push(sphere);
+    materials.push(sphereMat);
+  }
 
-  const ambientLight = new THREE.AmbientLight(0x220022, 0.5);
+  // Create ring of cubes
+  for (let i = 0; i < 12; i++) {
+    const cubeGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+    const cubeMat = new THREE.MeshStandardMaterial({
+      color: 0xff00ff,
+      metalness: 0.8,
+      roughness: 0.2,
+      emissive: 0x440044
+    });
+    
+    const cube = new THREE.Mesh(cubeGeo, cubeMat);
+    const angle = (i / 12) * Math.PI * 2;
+    cube.position.set(Math.cos(angle) * 6, 0, Math.sin(angle) * 6);
+    scene.add(cube);
+    objects.push(cube);
+    materials.push(cubeMat);
+  }
+
+  // Complex lighting setup
+  const lights = [];
+  
+  // Multiple colored point lights
+  for (let i = 0; i < 6; i++) {
+    const light = new THREE.PointLight(0xffffff, 2, 30);
+    const angle = (i / 6) * Math.PI * 2;
+    light.position.set(Math.cos(angle) * 15, Math.sin(angle) * 10, 5);
+    light.castShadow = true;
+    scene.add(light);
+    lights.push(light);
+  }
+
+  // Spotlight
+  const spotlight = new THREE.SpotLight(0xff00ff, 3, 50, Math.PI / 6);
+  spotlight.position.set(0, 20, 10);
+  spotlight.target = mainMesh;
+  spotlight.castShadow = true;
+  scene.add(spotlight);
+
+  // Ambient light
+  const ambientLight = new THREE.AmbientLight(0x220033, 0.3);
   scene.add(ambientLight);
 
-  // Position camera
-  camera.position.z = 5;
+  camera.position.set(0, 0, 15);
+
+  // Post-processing effects (simplified bloom effect)
+  const renderTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
 
   // Handle window resize
   window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderTarget.setSize(window.innerWidth, window.innerHeight);
   });
 
-  // Animation loop
+  // Animation variables
+  let time = 0;
+
+  // GPU-intensive animation loop
   function animate() {
     requestAnimationFrame(animate);
+    time += 0.016;
 
     // Get audio data
-    let avgFrequency = 50; // Default value
+    let avgFrequency = 50;
+    let frequencyArray = new Array(8).fill(50);
+    
     if (analyser && dataArray) {
       try {
         analyser.getByteFrequencyData(dataArray);
         avgFrequency = dataArray.reduce((a, b) => a + b) / dataArray.length;
+        
+        // Get frequency bands for different effects
+        const bandSize = Math.floor(dataArray.length / 8);
+        for (let i = 0; i < 8; i++) {
+          const start = i * bandSize;
+          const end = start + bandSize;
+          frequencyArray[i] = dataArray.slice(start, end).reduce((a, b) => a + b) / bandSize;
+        }
       } catch (err) {
-        // Use default value if audio analysis fails
+        // Use default values
       }
     }
 
-    // Rotate mesh
-    mesh.rotation.x += 0.01;
-    mesh.rotation.y += 0.012;
+    const normalizedAudio = avgFrequency / 255;
 
-    // Scale based on audio
-    const scale = 1 + avgFrequency / 200;
-    mesh.scale.set(scale, scale, scale);
+    // Update shader uniforms
+    shaderMaterial.uniforms.time.value = time;
+    shaderMaterial.uniforms.audioData.value = normalizedAudio;
 
-    // Change color based on audio
-    const hue = (avgFrequency * 3) % 360;
-    const emissiveColor = new THREE.Color(`hsl(${hue}, 100%, 60%)`);
-    mesh.material.emissive.set(emissiveColor);
-    mesh.material.color.set(emissiveColor);
+    // Animate main torus knot
+    mainMesh.rotation.x += 0.01 + normalizedAudio * 0.02;
+    mainMesh.rotation.y += 0.015 + normalizedAudio * 0.03;
+    mainMesh.rotation.z += 0.008;
+    mainMesh.scale.setScalar(1 + normalizedAudio * 0.5);
+
+    // Animate spheres
+    objects.slice(1, 9).forEach((sphere, i) => {
+      if (sphere.geometry.type === 'IcosahedronGeometry') {
+        const freq = frequencyArray[i] / 255;
+        sphere.rotation.x += 0.02 + freq * 0.05;
+        sphere.rotation.y += 0.03 + freq * 0.04;
+        sphere.scale.setScalar(1 + freq * 0.8);
+        
+        const angle = (i / 8) * Math.PI * 2 + time * 0.5;
+        sphere.position.x = Math.cos(angle) * (8 + freq * 3);
+        sphere.position.y = Math.sin(angle) * (8 + freq * 3);
+        sphere.position.z = Math.sin(time + i) * 3;
+      }
+    });
+
+    // Animate cubes
+    objects.slice(9).forEach((cube, i) => {
+      if (cube.geometry.type === 'BoxGeometry') {
+        const freq = frequencyArray[i % 8] / 255;
+        cube.rotation.x += 0.03 + freq * 0.06;
+        cube.rotation.y += 0.02 + freq * 0.04;
+        cube.rotation.z += 0.04 + freq * 0.05;
+        
+        const angle = (i / 12) * Math.PI * 2 - time * 0.3;
+        cube.position.x = Math.cos(angle) * 6;
+        cube.position.z = Math.sin(angle) * 6;
+        cube.position.y = Math.sin(time * 2 + i) * 2 + freq * 4;
+      }
+    });
+
+    // Animate particles
+    const positions = particles.geometry.attributes.position.array;
+    const colors = particles.geometry.attributes.color.array;
     
-    // Update point light color
-    pointLight.color.set(emissiveColor);
+    for (let i = 0; i < positions.length; i += 3) {
+      positions[i + 1] += Math.sin(time + positions[i] * 0.01) * 0.02;
+      
+      const colorIndex = Math.floor(i / 3) % frequencyArray.length;
+      const freq = frequencyArray[colorIndex] / 255;
+      colors[i] = freq;
+      colors[i + 1] = Math.sin(time + i * 0.1) * 0.5 + 0.5;
+      colors[i + 2] = Math.cos(time + i * 0.05) * 0.5 + 0.5;
+    }
+    
+    particles.geometry.attributes.position.needsUpdate = true;
+    particles.geometry.attributes.color.needsUpdate = true;
+    particles.rotation.y += 0.001 + normalizedAudio * 0.01;
+
+    // Animate lights
+    lights.forEach((light, i) => {
+      const freq = frequencyArray[i] / 255;
+      light.intensity = 1 + freq * 3;
+      light.color.setHSL((time * 0.1 + i * 0.2) % 1, 1, 0.5);
+      
+      const angle = (i / lights.length) * Math.PI * 2 + time * 0.2;
+      light.position.x = Math.cos(angle) * 15;
+      light.position.z = Math.sin(angle) * 15;
+      light.position.y = Math.sin(time + i) * 8;
+    });
+
+    // Camera movement
+    camera.position.x = Math.sin(time * 0.1) * 5;
+    camera.position.y = Math.cos(time * 0.15) * 3;
+    camera.position.z = 15 + Math.sin(time * 0.05) * 5;
+    camera.lookAt(0, 0, 0);
 
     // Render scene
     renderer.render(scene, camera);
   }
 
-  // Start animation
   animate();
 });
