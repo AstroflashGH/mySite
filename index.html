@@ -16,63 +16,78 @@
       <a href="#">Projects</a>
       <a href="#">About</a>
       <a href="#">Contact</a>
+      <button id="darkModeToggle" class="toggle-button">🌙</button>
     </div>
   </nav>
+
   <canvas id="audioCanvas"></canvas>
+
   <button id="startButton">Enter Astroflash</button>
   <audio id="bgAudio" src="song.mp3" preload="auto"></audio>
-  <button id="darkModeToggle" class="toggle-button">🌙</button>
+
+  <div id="volumeControl" class="volume-control" style="display: none;">
+    <label for="volumeSlider">🔊</label>
+    <input type="range" id="volumeSlider" min="0" max="100" value="50">
+    <span id="volumeDisplay">50%</span>
+  </div>
 
   <script>
-    // Dark mode toggle with fallback (no localStorage)
     const toggle = document.getElementById("darkModeToggle");
     const body = document.body;
+    const canvas = document.getElementById("audioCanvas");
+    let darkMode = false;
 
     function setTheme(isDark) {
+      darkMode = isDark;
       if (isDark) {
         body.classList.add("dark");
         toggle.textContent = "☀️";
+        canvas.style.background = "#0a0a0a";
       } else {
         body.classList.remove("dark");
         toggle.textContent = "🌙";
+        canvas.style.background = "#f5f7fa";
       }
     }
 
-    toggle.addEventListener("click", () => {
-      setTheme(!body.classList.contains("dark"));
-    });
+    setTheme(false); // initialize to light
+    toggle.addEventListener("click", () => setTheme(!darkMode));
 
-    // Audio visualization with error handling
     const startButton = document.getElementById("startButton");
     const audio = document.getElementById("bgAudio");
+    const volumeControl = document.getElementById("volumeControl");
+    const volumeSlider = document.getElementById("volumeSlider");
+    const volumeDisplay = document.getElementById("volumeDisplay");
+
+    // Set initial volume
+    audio.volume = 1;
+    volumeSlider.value = 50;
+    volumeDisplay.textContent = "50%";
+
+    volumeSlider.addEventListener("input", (e) => {
+      const volume = e.target.value / 100;
+      audio.volume = volume;
+      volumeDisplay.textContent = e.target.value + "%";
+    });
 
     startButton.addEventListener("click", async () => {
       try {
-        startButton.remove();
+        startButton.classList.add("fade-out");
+        setTimeout(() => startButton.remove(), 600); // matches the CSS fade duration
+        volumeControl.style.display = "flex";
 
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         const source = ctx.createMediaElementSource(audio);
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 64;
-
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
         source.connect(analyser);
         analyser.connect(ctx.destination);
-        
-        // Error handling for audio playback
-        audio.addEventListener('error', (e) => {
-          console.warn('Audio failed to load, continuing with silent visualization');
-        });
 
-        await audio.play().catch(e => {
-          console.warn('Audio playback failed, continuing with silent mode');
-        });
+        await audio.play().catch(e => console.warn("Playback failed", e));
 
-        // Canvas setup
-        const canvas = document.getElementById("audioCanvas");
         const ctx2d = canvas.getContext("2d");
-
         function resizeCanvas() {
           canvas.width = window.innerWidth;
           canvas.height = window.innerHeight;
@@ -86,42 +101,34 @@
           analyser.getByteFrequencyData(dataArray);
           const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
 
-          // Background flashes with volume
-          document.body.style.backgroundColor = `hsl(${avg * 3}, 80%, 20%)`;
+          document.body.style.backgroundColor = darkMode
+            ? `hsl(${avg * 3}, 60%, 10%)`
+            : `hsl(${avg * 3}, 80%, 20%)`;
 
-          // Fade background
-          ctx2d.fillStyle = "rgba(0, 0, 0, 0.2)";
+          ctx2d.fillStyle = darkMode ? "rgba(10, 10, 10, 0.2)" : "rgba(0, 0, 0, 0.2)";
           ctx2d.fillRect(0, 0, canvas.width, canvas.height);
 
-          // Center pulse circle
-          const radius = avg * 2;
           const centerX = canvas.width / 2;
           const centerY = canvas.height / 2;
+          const radius = avg * 2;
 
           ctx2d.beginPath();
           ctx2d.arc(centerX, centerY, radius, 0, Math.PI * 2);
           ctx2d.fillStyle = `hsl(${avg * 4}, 100%, 50%)`;
           ctx2d.fill();
 
-          // Spinning Triangles
           angle += 0.01 + avg / 3000;
-
           const numTriangles = 6;
           const orbitRadius = 200;
-          const pulse = 2 + Math.sin(Date.now() * 0.004) * 0.2;
+          const pulse = 1 + avg / 100;
 
           for (let i = 0; i < numTriangles; i++) {
             const angleOffset = (i / numTriangles) * Math.PI * 2;
             const spinAngle = angle + angleOffset;
-
             const x = centerX + Math.cos(spinAngle) * orbitRadius;
             const y = centerY + Math.sin(spinAngle) * orbitRadius;
-
-            const baseSize = 30 + avg / 6;
-            const size = baseSize * pulse;
-
+            const size = (30 + avg / 6) * pulse;
             const selfSpin = Date.now() * 0.002 + i;
-
             drawTriangle(x, y, size, selfSpin, `hsl(${avg * 5 + i * 40}, 80%, 60%)`);
           }
 
@@ -132,31 +139,26 @@
           ctx2d.save();
           ctx2d.translate(x, y);
           ctx2d.rotate(rotation);
-
           ctx2d.beginPath();
           ctx2d.moveTo(0, -size / 2);
           ctx2d.lineTo(-size / 2, size / 2);
           ctx2d.lineTo(size / 2, size / 2);
           ctx2d.closePath();
-
           ctx2d.fillStyle = color;
           ctx2d.fill();
           ctx2d.restore();
         }
 
         drawVisualizer();
-
-      } catch (error) {
-        console.error('Audio context initialization failed:', error);
-        // Fallback: show a message or continue without audio
-        alert('Audio features unavailable. The site will continue without sound.');
+      } catch (e) {
+        console.error("Audio init failed:", e);
+        alert("Audio features unavailable.");
       }
     });
 
-    // Bouncing title animation
+    // Bouncing Astroflash title
     const title = document.querySelector(".animated-title");
-    let x = 100, y = 100;
-    let dx = 2, dy = 2;
+    let x = 100, y = 100, dx = 2, dy = 2;
 
     function bounce() {
       const rect = title.getBoundingClientRect();
@@ -173,7 +175,6 @@
       title.style.top = y + "px";
 
       createTrail(x, y);
-
       requestAnimationFrame(bounce);
     }
 
@@ -187,17 +188,8 @@
       trail.classList.add("trail");
 
       document.body.appendChild(trail);
-
-      setTimeout(() => {
-        trail.style.transition = "opacity 0.5s ease-out";
-        trail.style.opacity = "0";
-      }, 10);
-
-      setTimeout(() => {
-        if (trail.parentNode) {
-          trail.remove();
-        }
-      }, 600);
+      setTimeout(() => trail.style.opacity = "0", 10);
+      setTimeout(() => trail.remove(), 600);
     }
 
     bounce();
