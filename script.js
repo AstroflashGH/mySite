@@ -92,7 +92,7 @@ startButton.addEventListener("click", async () => {
     audio.volume = 0.5;
     await audio.play();
   } catch (err) {
-    console.warn("Audio playback blocked:", err);
+    console.warn("Audio playbook blocked:", err);
   }
 
   // Setup Web Audio API
@@ -130,7 +130,6 @@ startButton.addEventListener("click", async () => {
   const objects = [];
   const materials = [];
   const cubeMaterials = []; // New array to hold cube materials
-  const donutMeshes = []; // New array to hold donut meshes
 
   // Main torus knot with custom shader
   const mainGeometry = new THREE.TorusKnotGeometry(2, 0.6, 200, 32);
@@ -150,44 +149,8 @@ startButton.addEventListener("click", async () => {
   objects.push(mainMesh);
   materials.push(shaderMaterial);
 
-  // --- NEW CODE FOR DONUTS ---
-  const donutGeometry = new THREE.TorusGeometry(1.5, 0.5, 16, 100); // Smaller donut
-  
-  // Left Donut
-  const donutMaterial1 = new THREE.MeshPhongMaterial({
-    color: 0x00ff00, // Initial color
-    emissive: 0x008800,
-    shininess: 100,
-    transparent: true,
-    opacity: 0.8
-  });
-  const donutMesh1 = new THREE.Mesh(donutGeometry, donutMaterial1);
-  donutMesh1.position.set(-8, 0, 0); // Position to the left
-  donutMesh1.castShadow = true;
-  donutMesh1.receiveShadow = true;
-  scene.add(donutMesh1);
-  donutMeshes.push(donutMesh1); // Add to new array for animation
-  objects.push(donutMesh1); // Also add to general objects array if needed for other global ops
-
-  // Right Donut
-  const donutMaterial2 = new THREE.MeshPhongMaterial({
-    color: 0xffff00, // Initial color
-    emissive: 0x888800,
-    shininess: 100,
-    transparent: true,
-    opacity: 0.8
-  });
-  const donutMesh2 = new THREE.Mesh(donutGeometry, donutMaterial2);
-  donutMesh2.position.set(8, 0, 0); // Position to the right
-  donutMesh2.castShadow = true;
-  donutMesh2.receiveShadow = true;
-  scene.add(donutMesh2);
-  donutMeshes.push(donutMesh2); // Add to new array for animation
-  objects.push(donutMesh2); // Also add to general objects array if needed for other global ops
-  // --- END NEW CODE FOR DONUTS ---
-
   // Create particle system
-  const particleCount = 500;
+  const particleCount = 100;
   const particleGeometry = new THREE.BufferGeometry();
   const positions = new Float32Array(particleCount * 3);
   const colors = new Float32Array(particleCount * 3);
@@ -217,17 +180,18 @@ startButton.addEventListener("click", async () => {
 
   // Create multiple rotating spheres
   for (let i = 0; i < 8; i++) {
-    const sphereGeo = new THREE.IcosahedronGeometry(0.5, 4);
+    const sphereGeo = new THREE.IcosahedronGeometry(1.2, 4); // Increased size from 0.5 to 1.2
     const sphereMat = new THREE.MeshPhongMaterial({
-      color: new THREE.Color().setHSL(i / 8, 1, 0.5),
-      transparent: true,
-      opacity: 0.7,
-      shininess: 100
+      color: new THREE.Color().setHSL(i / 8, 1, 0.7), // Increased lightness from 0.5 to 0.7
+      transparent: false, // Made them fully opaque
+      opacity: 1.0, // Full opacity
+      shininess: 100,
+      emissive: new THREE.Color().setHSL(i / 8, 0.5, 0.2) // Added emissive glow
     });
     
     const sphere = new THREE.Mesh(sphereGeo, sphereMat);
     const angle = (i / 8) * Math.PI * 2;
-    sphere.position.set(Math.cos(angle) * 8, Math.sin(angle) * 8, 0);
+    sphere.position.set(Math.cos(angle) * 12, Math.sin(angle) * 12, 0); // Moved further out from 8 to 12
     scene.add(sphere);
     objects.push(sphere);
     materials.push(sphereMat);
@@ -330,45 +294,24 @@ startButton.addEventListener("click", async () => {
     mainMesh.rotation.z += 0.008;
     mainMesh.scale.setScalar(1 + normalizedAudio * 0.5);
 
-    // --- NEW CODE FOR DONUT ANIMATION ---
-    donutMeshes.forEach((donut, i) => {
-      const freq = frequencyArray[i % frequencyArray.length] / 255; // Use modulo for frequency band
-      
-      // Rotate
-      donut.rotation.x += 0.015 + freq * 0.03;
-      donut.rotation.y += 0.02 + freq * 0.04;
-
-      // Scale (pulsate with music)
-      donut.scale.setScalar(1 + freq * 0.3); // Scale up based on frequency
-
-      // Change color based on frequency and time
-      const hue = (time * 0.08 + freq * 0.3 + i * 0.5) % 1; // Different hue for each donut, reacting to time and frequency
-      const saturation = 0.7 + freq * 0.3;
-      const lightness = 0.6 + freq * 0.2;
-      donut.material.color.setHSL(hue, saturation, lightness);
-      donut.material.emissive.setHSL(hue, saturation * 0.5, lightness * 0.5);
-
-      // Simple oscillation on Y-axis
-      donut.position.y = Math.sin(time * 2 + i * Math.PI) * (1 + freq) * 0.5; // oscillate up/down
-      
-      // Small orbital movement around their original X position
-      donut.position.x = (i === 0 ? -8 : 8) + Math.cos(time * 0.5 + i * Math.PI) * freq * 2;
-      donut.position.z = Math.sin(time * 0.7 + i * Math.PI) * freq * 1.5;
-    });
-    // --- END NEW CODE FOR DONUT ANIMATION ---
-
-    // Animate spheres
-    objects.slice(1, 9).forEach((sphere, i) => { // Adjusted slice range if donuts are added to 'objects' earlier
-      if (sphere.geometry.type === 'IcosahedronGeometry') {
+    // Animate spheres - fixed indexing after removing donuts
+    const sphereStartIndex = 1; // After main torus knot (0)
+    objects.slice(sphereStartIndex, sphereStartIndex + 8).forEach((sphere, i) => {
+      if (sphere.geometry && sphere.geometry.type === 'IcosahedronGeometry') {
         const freq = frequencyArray[i] / 255;
         sphere.rotation.x += 0.02 + freq * 0.05;
         sphere.rotation.y += 0.03 + freq * 0.04;
         sphere.scale.setScalar(1 + freq * 0.8);
         
         const angle = (i / 8) * Math.PI * 2 + time * 0.5;
-        sphere.position.x = Math.cos(angle) * (8 + freq * 3);
-        sphere.position.y = Math.sin(angle) * (8 + freq * 3);
+        sphere.position.x = Math.cos(angle) * (12 + freq * 3); // Updated radius to match new position
+        sphere.position.y = Math.sin(angle) * (12 + freq * 3);
         sphere.position.z = Math.sin(time + i) * 3;
+
+        // Enhanced color animation for better visibility
+        const hue = (time * 0.1 + i * 0.125) % 1; // Slower, more distinct color changes
+        sphere.material.color.setHSL(hue, 1, 0.7);
+        sphere.material.emissive.setHSL(hue, 0.5, 0.2 + freq * 0.3);
       }
     });
 
@@ -383,7 +326,7 @@ startButton.addEventListener("click", async () => {
       material.color.setHSL(hue, saturation, lightness);
       material.emissive.setHSL(hue, saturation * 0.5, lightness * 0.5);
 
-      const cube = objects[9 + i]; // Ensure correct index if new objects are added before cubes
+      const cube = objects[9 + i]; // Updated index after removing donuts
       cube.rotation.x += 0.03 + freq * 0.06;
       cube.rotation.y += 0.02 + freq * 0.04;
       cube.rotation.z += 0.04 + freq * 0.05;
