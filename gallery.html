@@ -4,37 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Astroflash - Gallery</title>
-    <link rel="stylesheet" href="style.css"> <style>
-        /* Specific styles for the gallery page */
+    <link rel="stylesheet" href="style.css"> 
+    <style>
+        /* Override the main body styles to allow scrolling */
         body {
-            background: linear-gradient(to bottom, #0a0a20, #000000); /* Dark space background */
+            background: linear-gradient(to bottom, #0a0a20 0%, #000000 100%);
+            background-attachment: fixed; /* Keep gradient fixed while scrolling */
             color: #ffffff;
-            font-family: 'Inter', sans-serif; /* Use your main font */
+            font-family: 'Inter', sans-serif;
             min-height: 100vh;
+            overflow-x: hidden; /* Prevent horizontal scroll */
+            overflow-y: auto; /* Allow vertical scrolling */
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding-bottom: 50px; /* Space at the bottom */
+            padding-bottom: 50px;
         }
 
         .gallery-container {
             width: 90%;
-            max-width: 900px; /* Max width for readability */
-            margin-top: 80px; /* Space from top */
+            max-width: 900px;
+            margin-top: 80px;
             display: flex;
-            flex-direction: column; /* Images stacked vertically */
-            gap: 40px; /* Space between images */
-            align-items: center; /* Center images horizontally */
+            flex-direction: column;
+            gap: 40px;
+            align-items: center;
         }
 
         .gallery-item {
-            width: 100%; /* Take full width of container */
-            background-color: rgba(255, 255, 255, 0.05); /* Slightly transparent background */
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.05);
             border-radius: 10px;
-            overflow: hidden; /* Ensure image corners are rounded */
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); /* Deep shadow for floating effect */
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
             transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
-            border: 1px solid rgba(255, 255, 255, 0.1); /* Subtle border */
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .gallery-item:hover {
@@ -44,17 +48,17 @@
 
         .gallery-item img {
             width: 100%;
-            height: auto; /* Maintain aspect ratio */
+            height: auto;
             display: block;
-            object-fit: contain; /* Scales down image to fit, maintains aspect ratio */
-            max-height: 500px; /* Limit height of very tall images if needed */
+            object-fit: contain;
+            max-height: 500px;
         }
 
         .gallery-item-caption {
             padding: 15px 20px;
             font-size: 1.1em;
             text-align: center;
-            background-color: rgba(0, 0, 0, 0.3); /* Darker caption background */
+            background-color: rgba(0, 0, 0, 0.3);
             border-top: 1px solid rgba(255, 255, 255, 0.05);
         }
 
@@ -65,14 +69,15 @@
             left: 0;
             width: 100%;
             padding: 20px;
-            background: rgba(0, 0, 0, 0.7); /* Semi-transparent black background */
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
             z-index: 1000;
             text-align: center;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
         }
 
         .gallery-nav a {
-            color: #ffffff; /* Your vibrant accent color */
+            color: #ffffff;
             text-decoration: none;
             font-size: 1.3em;
             font-weight: bold;
@@ -80,14 +85,32 @@
         }
 
         .gallery-nav a:hover {
-            color: #8000ff; /* Another accent color on hover */
+            color: #8000ff;
+        }
+
+        /* Custom scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 0, 255, 0.6);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 0, 255, 0.8);
         }
 
         /* Responsive adjustments */
         @media (max-width: 768px) {
             .gallery-container {
                 width: 95%;
-                margin-top: 60px;
+                margin-top: 70px;
                 gap: 30px;
             }
             .gallery-item img {
@@ -102,12 +125,18 @@
         }
 
         @media (max-width: 480px) {
+            .gallery-container {
+                margin-top: 60px;
+            }
             .gallery-item img {
                 max-height: 300px;
             }
             .gallery-item-caption {
                 font-size: 0.9em;
                 padding: 10px 15px;
+            }
+            .gallery-nav {
+                padding: 15px;
             }
         }
     </style>
@@ -119,32 +148,29 @@
 
     <div class="gallery-container">
         <div class="gallery-item">
-            <img src="images/image1.png" alt="Beautiful Spiral Galaxy">
-            <div class="gallery-item-caption">A mesmerizing spiral galaxy in the cosmic void.</div>
+            <img src="images/image1.png" alt="Nature house">
+            <div class="gallery-item-caption">House inside a box inside the world (3440x1440)</div>
         </div>
 
         <div class="gallery-item">
-            <img src="images/image2.png" alt="Vast Nebula Cloudscape">
-            <div class="gallery-item-caption">A vast, colorful nebula, where stars are born.</div>
+            <img src="images/image2.png" alt="Nature 3D TVs">
+            <div class="gallery-item-caption">Nature-infused retro TVs (3440x1440)</div>
         </div>
 
         <div class="gallery-item">
-            <img src="images/image3.png" alt="Alien Planet Surface">
-            <div class="gallery-item-caption">Exploring the rugged surface of an exoplanet.</div>
+            <img src="images/image3.png" alt="Stylized snowy mountain landscape">
+            <div class="gallery-item-caption">Stylized snowy mountain landscape (5120x1440)</div>
         </div>
 
         <div class="gallery-item">
-            <img src="images/image4.png" alt="Astronaut floating in space">
-            <div class="gallery-item-caption">An astronaut in the infinite expanse.</div>
+            <img src="images/image4.png" alt="Purple abstract liquid">
+            <div class="gallery-item-caption">Abstract purple liquid init (3440x1440)</div>
         </div>
 
         <div class="gallery-item">
-            <img src="images/image5.png" alt="Astronaut floating in space">
-            <div class="gallery-item-caption">An astronaut in the infinite expanse.</div>
+            <img src="images/image5.png" alt="lines pic">
+            <div class="gallery-item-caption">I forgot the prompt (3440x1440)</div>
         </div>
-
-
-
-        </div>
+    </div>
 </body>
 </html>
