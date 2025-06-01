@@ -10,7 +10,6 @@ const audio = document.getElementById("bgAudio");
 
 // Global state
 let isDarkMode = true;
-document.body.classList.add('dark');
 let renderer = null;
 
 // Dark mode toggle functionality
