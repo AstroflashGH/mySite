@@ -7,16 +7,23 @@ const volumeSlider = document.getElementById("volumeSlider");
 const volumeDisplay = document.getElementById("volumeDisplay");
 const darkToggle = document.getElementById("darkModeToggle");
 const audio = document.getElementById("bgAudio");
+const astroflashTitle = document.querySelector(".animated-title");
 
 // Global state
 let isDarkMode = true;
+document.body.classList.add('dark');
 let renderer = null;
+let currentScene = 0; // 0 = original scene, 1 = new scene
+let scenes = [];
+let cameras = [];
+let animationFunctions = [];
+let audioContext, audioSource, analyser, dataArray;
 
 // Dark mode toggle functionality
 function toggleDarkMode() {
   isDarkMode = !isDarkMode;
   document.body.classList.toggle('dark');
-  darkToggle.textContent = isDarkMode ? "🌙" : "☀️";
+  darkToggle.textContent = isDarkMode ? "☀️" : "🌙";
   console.log('Dark mode toggled:', isDarkMode);
 }
 
@@ -31,7 +38,26 @@ volumeSlider.addEventListener("input", () => {
   }
 });
 
-// Custom shader material for procedural effects
+// Scene cycling functionality
+function cycleScene() {
+  if (scenes.length > 0) {
+    currentScene = (currentScene + 1) % scenes.length;
+    console.log('Switched to scene:', currentScene);
+    
+    // Add visual feedback
+    astroflashTitle.style.transform = 'scale(1.1)';
+    astroflashTitle.style.color = '#ff00ff';
+    setTimeout(() => {
+      astroflashTitle.style.transform = 'scale(1)';
+      astroflashTitle.style.color = '';
+    }, 200);
+  }
+}
+
+astroflashTitle.addEventListener("click", cycleScene);
+astroflashTitle.style.cursor = "pointer";
+
+// Custom shader material for procedural effects (Scene 1)
 const vertexShader = `
   varying vec2 vUv;
   varying vec3 vPosition;
@@ -45,7 +71,6 @@ const vertexShader = `
     vNormal = normal;
     
     vec3 pos = position;
-    // Increased the multiplier for audioData from 0.3 to 1.5 for larger oscillation
     float wave = sin(pos.x * 10.0 + time * 2.0) * cos(pos.y * 8.0 + time * 1.5) * audioData * 1.5;
     pos += normal * wave;
     
@@ -79,57 +104,60 @@ const fragmentShader = `
   }
 `;
 
-// Main application start
-startButton.addEventListener("click", async () => {
-  console.log('Starting GPU-intensive 3D scene...');
+// Tunnel shader for Scene 2
+const tunnelVertexShader = `
+  varying vec2 vUv;
+  varying vec3 vPosition;
+  uniform float time;
+  uniform float audioData;
   
-  startButton.classList.add("fade-out");
-  setTimeout(() => startButton.remove(), 500);
-  volumeControl.style.display = "flex";
-
-  // Setup audio
-  try {
-    audio.volume = 0.5;
-    await audio.play();
-  } catch (err) {
-    console.warn("Audio playbook blocked:", err);
+  void main() {
+    vUv = uv;
+    vPosition = position;
+    
+    vec3 pos = position;
+    float ripple = sin(length(pos.xy) * 8.0 - time * 4.0) * audioData * 0.3;
+    pos.z += ripple;
+    
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
   }
+`;
 
-  // Setup Web Audio API
-  let audioContext, audioSource, analyser, dataArray;
-  try {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    audioSource = audioContext.createMediaElementSource(audio);
-    analyser = audioContext.createAnalyser();
-    analyser.fftSize = 256;
-    dataArray = new Uint8Array(analyser.frequencyBinCount);
-    audioSource.connect(analyser);
-    analyser.connect(audioContext.destination);
-  } catch (err) {
-    console.warn("Web Audio API setup failed:", err);
-    dataArray = new Uint8Array(128).fill(50); // Fallback for no audio data
+const tunnelFragmentShader = `
+  varying vec2 vUv;
+  varying vec3 vPosition;
+  uniform float time;
+  uniform float audioData;
+  
+  void main() {
+    vec2 center = vec2(0.5, 0.5);
+    float dist = distance(vUv, center);
+    
+    float tunnel = sin(dist * 20.0 - time * 6.0) * 0.5 + 0.5;
+    float rings = sin(dist * 50.0 - time * 10.0) * 0.3 + 0.7;
+    
+    vec3 color1 = vec3(1.0, 0.0, 1.0); // Magenta
+    vec3 color2 = vec3(0.0, 1.0, 1.0); // Cyan
+    vec3 color3 = vec3(1.0, 1.0, 0.0); // Yellow
+    
+    vec3 color = mix(color1, color2, tunnel);
+    color = mix(color, color3, rings);
+    
+    float intensity = (1.0 - dist) * (audioData * 2.0 + 0.5);
+    color *= intensity;
+    
+    gl_FragColor = vec4(color, 1.0);
   }
+`;
 
-  // Three.js Setup with enhanced settings
+// Create Scene 1 (Original)
+function createScene1() {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
   
-  renderer = new THREE.WebGLRenderer({ 
-    antialias: true, 
-    alpha: true,
-    powerPreference: "high-performance"
-  });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setClearColor(0x000000, 0);
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  document.body.appendChild(renderer.domElement);
-
-  // Create multiple complex geometries
   const objects = [];
   const materials = [];
-  const cubeMaterials = []; // New array to hold cube materials
+  const cubeMaterials = [];
 
   // Main torus knot with custom shader
   const mainGeometry = new THREE.TorusKnotGeometry(2, 0.6, 200, 32);
@@ -180,18 +208,18 @@ startButton.addEventListener("click", async () => {
 
   // Create multiple rotating spheres
   for (let i = 0; i < 8; i++) {
-    const sphereGeo = new THREE.IcosahedronGeometry(1.2, 4); // Increased size from 0.5 to 1.2
+    const sphereGeo = new THREE.IcosahedronGeometry(1.2, 4);
     const sphereMat = new THREE.MeshPhongMaterial({
-      color: new THREE.Color().setHSL(i / 8, 1, 0.7), // Increased lightness from 0.5 to 0.7
-      transparent: false, // Made them fully opaque
-      opacity: 1.0, // Full opacity
+      color: new THREE.Color().setHSL(i / 8, 1, 0.7),
+      transparent: false,
+      opacity: 1.0,
       shininess: 100,
-      emissive: new THREE.Color().setHSL(i / 8, 0.5, 0.2) // Added emissive glow
+      emissive: new THREE.Color().setHSL(i / 8, 0.5, 0.2)
     });
     
     const sphere = new THREE.Mesh(sphereGeo, sphereMat);
     const angle = (i / 8) * Math.PI * 2;
-    sphere.position.set(Math.cos(angle) * 12, Math.sin(angle) * 12, 0); // Moved further out from 8 to 12
+    sphere.position.set(Math.cos(angle) * 12, Math.sin(angle) * 12, 0);
     scene.add(sphere);
     objects.push(sphere);
     materials.push(sphereMat);
@@ -201,7 +229,7 @@ startButton.addEventListener("click", async () => {
   for (let i = 0; i < 12; i++) {
     const cubeGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
     const cubeMat = new THREE.MeshStandardMaterial({
-      color: 0xff00ff, // Initial color
+      color: 0xff00ff,
       metalness: 0.8,
       roughness: 0.2,
       emissive: 0x440044
@@ -213,13 +241,12 @@ startButton.addEventListener("click", async () => {
     scene.add(cube);
     objects.push(cube);
     materials.push(cubeMat);
-    cubeMaterials.push(cubeMat); // Store cube material for individual color control
+    cubeMaterials.push(cubeMat);
   }
 
   // Complex lighting setup
   const lights = [];
   
-  // Multiple colored point lights
   for (let i = 0; i < 6; i++) {
     const light = new THREE.PointLight(0xffffff, 2, 30);
     const angle = (i / 6) * Math.PI * 2;
@@ -229,59 +256,21 @@ startButton.addEventListener("click", async () => {
     lights.push(light);
   }
 
-  // Spotlight
   const spotlight = new THREE.SpotLight(0xff00ff, 3, 50, Math.PI / 6);
   spotlight.position.set(0, 20, 10);
   spotlight.target = mainMesh;
   spotlight.castShadow = true;
   scene.add(spotlight);
 
-  // Ambient light
   const ambientLight = new THREE.AmbientLight(0x220033, 0.3);
   scene.add(ambientLight);
 
   camera.position.set(0, 0, 15);
 
-  // Post-processing effects (simplified bloom effect)
-  const renderTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
-
-  // Handle window resize
-  window.addEventListener("resize", () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderTarget.setSize(window.innerWidth, window.innerHeight);
-  });
-
-  // Animation variables
-  let time = 0;
-
-  // GPU-intensive animation loop
-  function animate() {
-    requestAnimationFrame(animate);
-    time += 0.016;
-
-    // Get audio data
-    let avgFrequency = 50;
-    let frequencyArray = new Array(8).fill(50);
-    
-    if (analyser && dataArray) {
-      try {
-        analyser.getByteFrequencyData(dataArray);
-        avgFrequency = dataArray.reduce((a, b) => a + b) / dataArray.length;
-        
-        // Get frequency bands for different effects
-        const bandSize = Math.floor(dataArray.length / 8);
-        for (let i = 0; i < 8; i++) {
-          const start = i * bandSize;
-          const end = start + bandSize;
-          frequencyArray[i] = dataArray.slice(start, end).reduce((a, b) => a + b) / bandSize;
-        }
-      } catch (err) {
-        // Use default values
-      }
-    }
-
+  // Animation function for Scene 1
+  const animateScene1 = (time) => {
+    const avgFrequency = getAverageFrequency();
+    const frequencyArray = getFrequencyArray();
     const normalizedAudio = avgFrequency / 255;
 
     // Update shader uniforms
@@ -294,8 +283,8 @@ startButton.addEventListener("click", async () => {
     mainMesh.rotation.z += 0.008;
     mainMesh.scale.setScalar(1 + normalizedAudio * 0.5);
 
-    // Animate spheres - fixed indexing after removing donuts
-    const sphereStartIndex = 1; // After main torus knot (0)
+    // Animate spheres
+    const sphereStartIndex = 1;
     objects.slice(sphereStartIndex, sphereStartIndex + 8).forEach((sphere, i) => {
       if (sphere.geometry && sphere.geometry.type === 'IcosahedronGeometry') {
         const freq = frequencyArray[i] / 255;
@@ -304,18 +293,17 @@ startButton.addEventListener("click", async () => {
         sphere.scale.setScalar(1 + freq * 0.8);
         
         const angle = (i / 8) * Math.PI * 2 + time * 0.5;
-        sphere.position.x = Math.cos(angle) * (12 + freq * 3); // Updated radius to match new position
+        sphere.position.x = Math.cos(angle) * (12 + freq * 3);
         sphere.position.y = Math.sin(angle) * (12 + freq * 3);
         sphere.position.z = Math.sin(time + i) * 3;
 
-        // Enhanced color animation for better visibility
-        const hue = (time * 0.1 + i * 0.125) % 1; // Slower, more distinct color changes
+        const hue = (time * 0.1 + i * 0.125) % 1;
         sphere.material.color.setHSL(hue, 1, 0.7);
         sphere.material.emissive.setHSL(hue, 0.5, 0.2 + freq * 0.3);
       }
     });
 
-    // Animate cubes and change their color with music
+    // Animate cubes
     cubeMaterials.forEach((material, i) => {
       const freq = frequencyArray[i % frequencyArray.length] / 255;
       
@@ -326,7 +314,7 @@ startButton.addEventListener("click", async () => {
       material.color.setHSL(hue, saturation, lightness);
       material.emissive.setHSL(hue, saturation * 0.5, lightness * 0.5);
 
-      const cube = objects[9 + i]; // Updated index after removing donuts
+      const cube = objects[9 + i];
       cube.rotation.x += 0.03 + freq * 0.06;
       cube.rotation.y += 0.02 + freq * 0.04;
       cube.rotation.z += 0.04 + freq * 0.05;
@@ -372,9 +360,272 @@ startButton.addEventListener("click", async () => {
     camera.position.y = Math.cos(time * 0.15) * 3;
     camera.position.z = 15 + Math.sin(time * 0.05) * 5;
     camera.lookAt(0, 0, 0);
+  };
 
-    // Render scene
-    renderer.render(scene, camera);
+  return { scene, camera, animate: animateScene1 };
+}
+
+// Create Scene 2 (New Tunnel Scene)
+function createScene2() {
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+  
+  const objects = [];
+
+  // Create tunnel geometry
+  const tunnelGeometry = new THREE.CylinderGeometry(10, 10, 100, 32, 50, true);
+  const tunnelMaterial = new THREE.ShaderMaterial({
+    vertexShader: tunnelVertexShader,
+    fragmentShader: tunnelFragmentShader,
+    uniforms: {
+      time: { value: 0 },
+      audioData: { value: 0 }
+    },
+    side: THREE.DoubleSide,
+    transparent: true
+  });
+  
+  const tunnel = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
+  tunnel.rotation.x = Math.PI / 2;
+  scene.add(tunnel);
+  objects.push(tunnel);
+
+  // Create floating crystals
+  const crystals = [];
+  for (let i = 0; i < 20; i++) {
+    const crystalGeo = new THREE.ConeGeometry(0.5, 2, 6);
+    const crystalMat = new THREE.MeshPhongMaterial({
+      color: new THREE.Color().setHSL(Math.random(), 1, 0.8),
+      transparent: true,
+      opacity: 0.8,
+      emissive: new THREE.Color().setHSL(Math.random(), 0.5, 0.3)
+    });
+    
+    const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+    crystal.position.set(
+      (Math.random() - 0.5) * 15,
+      (Math.random() - 0.5) * 80,
+      (Math.random() - 0.5) * 15
+    );
+    crystal.rotation.set(
+      Math.random() * Math.PI,
+      Math.random() * Math.PI,
+      Math.random() * Math.PI
+    );
+    
+    scene.add(crystal);
+    crystals.push(crystal);
+    objects.push(crystal);
+  }
+
+  // Create energy orbs
+  const orbs = [];
+  for (let i = 0; i < 15; i++) {
+    const orbGeo = new THREE.SphereGeometry(0.3, 16, 16);
+    const orbMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.9
+    });
+    
+    const orb = new THREE.Mesh(orbGeo, orbMat);
+    orb.position.set(
+      Math.cos(i * 0.4) * 8,
+      (i - 7.5) * 8,
+      Math.sin(i * 0.4) * 8
+    );
+    
+    scene.add(orb);
+    orbs.push(orb);
+    objects.push(orb);
+  }
+
+  // Lighting for Scene 2
+  const lights = [];
+  for (let i = 0; i < 4; i++) {
+    const light = new THREE.PointLight(0xff00ff, 2, 20);
+    const angle = (i / 4) * Math.PI * 2;
+    light.position.set(Math.cos(angle) * 8, 0, Math.sin(angle) * 8);
+    scene.add(light);
+    lights.push(light);
+  }
+
+  const ambientLight = new THREE.AmbientLight(0x440044, 0.4);
+  scene.add(ambientLight);
+
+  camera.position.set(0, -30, 0);
+  camera.lookAt(0, 0, 0);
+
+  // Animation function for Scene 2
+  const animateScene2 = (time) => {
+    const avgFrequency = getAverageFrequency();
+    const frequencyArray = getFrequencyArray();
+    const normalizedAudio = avgFrequency / 255;
+
+    // Update tunnel shader
+    tunnelMaterial.uniforms.time.value = time;
+    tunnelMaterial.uniforms.audioData.value = normalizedAudio;
+
+    // Move camera through tunnel
+    camera.position.y = -30 + Math.sin(time * 0.3) * 20;
+    camera.position.x = Math.sin(time * 0.2) * 3;
+    camera.position.z = Math.cos(time * 0.2) * 3;
+    camera.lookAt(0, camera.position.y + 20, 0);
+
+    // Animate crystals
+    crystals.forEach((crystal, i) => {
+      const freq = frequencyArray[i % frequencyArray.length] / 255;
+      crystal.rotation.x += 0.02 + freq * 0.05;
+      crystal.rotation.y += 0.015 + freq * 0.04;
+      crystal.scale.setScalar(1 + freq * 0.5);
+      
+      const hue = (time * 0.1 + i * 0.1) % 1;
+      crystal.material.color.setHSL(hue, 1, 0.8);
+      crystal.material.emissive.setHSL(hue, 0.5, 0.3 + freq * 0.4);
+      
+      crystal.position.y += Math.sin(time + i) * 0.02;
+    });
+
+    // Animate orbs
+    orbs.forEach((orb, i) => {
+      const freq = frequencyArray[i % frequencyArray.length] / 255;
+      const angle = time * 0.5 + i * 0.4;
+      
+      orb.position.x = Math.cos(angle) * (8 + freq * 3);
+      orb.position.z = Math.sin(angle) * (8 + freq * 3);
+      orb.scale.setScalar(1 + freq * 2);
+      
+      const hue = (time * 0.2 + i * 0.07) % 1;
+      orb.material.color.setHSL(hue, 1, 0.8);
+    });
+
+    // Animate lights
+    lights.forEach((light, i) => {
+      const freq = frequencyArray[i] / 255;
+      light.intensity = 1 + freq * 4;
+      
+      const angle = (i / lights.length) * Math.PI * 2 + time * 0.3;
+      light.position.x = Math.cos(angle) * 8;
+      light.position.z = Math.sin(angle) * 8;
+      light.position.y = Math.sin(time + i) * 10;
+      
+      const hue = (time * 0.15 + i * 0.25) % 1;
+      light.color.setHSL(hue, 1, 0.6);
+    });
+  };
+
+  return { scene, camera, animate: animateScene2 };
+}
+
+// Audio utility functions
+function getAverageFrequency() {
+  if (analyser && dataArray) {
+    try {
+      analyser.getByteFrequencyData(dataArray);
+      return dataArray.reduce((a, b) => a + b) / dataArray.length;
+    } catch (err) {
+      return 50;
+    }
+  }
+  return 50;
+}
+
+function getFrequencyArray() {
+  if (analyser && dataArray) {
+    try {
+      analyser.getByteFrequencyData(dataArray);
+      const bandSize = Math.floor(dataArray.length / 8);
+      const frequencyArray = [];
+      for (let i = 0; i < 8; i++) {
+        const start = i * bandSize;
+        const end = start + bandSize;
+        frequencyArray[i] = dataArray.slice(start, end).reduce((a, b) => a + b) / bandSize;
+      }
+      return frequencyArray;
+    } catch (err) {
+      return new Array(8).fill(50);
+    }
+  }
+  return new Array(8).fill(50);
+}
+
+// Main application start
+startButton.addEventListener("click", async () => {
+  console.log('Starting GPU-intensive 3D scene...');
+  
+  startButton.classList.add("fade-out");
+  setTimeout(() => startButton.remove(), 500);
+  volumeControl.style.display = "flex";
+
+  // Setup audio
+  try {
+    audio.volume = 0.5;
+    await audio.play();
+  } catch (err) {
+    console.warn("Audio playback blocked:", err);
+  }
+
+  // Setup Web Audio API
+  try {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    audioSource = audioContext.createMediaElementSource(audio);
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+    audioSource.connect(analyser);
+    analyser.connect(audioContext.destination);
+  } catch (err) {
+    console.warn("Web Audio API setup failed:", err);
+    dataArray = new Uint8Array(128).fill(50);
+  }
+
+  // Three.js Setup
+  renderer = new THREE.WebGLRenderer({ 
+    antialias: true, 
+    alpha: true,
+    powerPreference: "high-performance"
+  });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x000000, 0);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+
+  // Create both scenes
+  const scene1Data = createScene1();
+  const scene2Data = createScene2();
+  
+  scenes.push(scene1Data.scene, scene2Data.scene);
+  cameras.push(scene1Data.camera, scene2Data.camera);
+  animationFunctions.push(scene1Data.animate, scene2Data.animate);
+
+  // Handle window resize
+  window.addEventListener("resize", () => {
+    cameras.forEach(camera => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // Animation variables
+  let time = 0;
+
+  // Main animation loop
+  function animate() {
+    requestAnimationFrame(animate);
+    time += 0.016;
+
+    // Run the current scene's animation
+    if (animationFunctions[currentScene]) {
+      animationFunctions[currentScene](time);
+    }
+
+    // Render the current scene
+    if (scenes[currentScene] && cameras[currentScene]) {
+      renderer.render(scenes[currentScene], cameras[currentScene]);
+    }
   }
 
   animate();
