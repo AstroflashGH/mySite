@@ -9,14 +9,15 @@ const darkToggle = document.getElementById("darkModeToggle");
 const audio = document.getElementById("bgAudio");
 
 // Global state
-let isDarkMode = false;
+let isDarkMode = true;
+document.body.classList.add('dark');
 let renderer = null;
 
 // Dark mode toggle functionality
 function toggleDarkMode() {
   isDarkMode = !isDarkMode;
   document.body.classList.toggle('dark');
-  darkToggle.textContent = isDarkMode ? "☀️" : "🌙";
+  darkToggle.textContent = isDarkMode ? "🌙" : "☀️";
   console.log('Dark mode toggled:', isDarkMode);
 }
 
